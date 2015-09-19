@@ -1,5 +1,6 @@
 from collections import Counter
 import operator
+import itertools
 from models.ArffFile import ArffFile
 from models.DataReprConfig import DataReprConfig
 from models.DataInstance import DataInstance
@@ -12,11 +13,9 @@ delimiter = ','
 quotechar = "'"
 
 class DataSet:
-    _rows = []
-    _class_index=None
-    _headers=[]
-
     def __init__(self, rows, class_index=0, headers=None):
+        self.repr_config=None
+        self.name="no_name"
         if headers==None:
             self._headers=DataInstance(rows[0], class_index)
             r=rows[1:]
@@ -41,19 +40,20 @@ class DataSet:
     def get_rows(self):
         return self._rows
 
-    def to_csv(self, repr_config=None):
-        if repr_config == None:
-            rc = self.compute_csv_repr_config()
-        else:
-            rc = repr_config
+    def to_csv(self):
+        rc = self.get_repr_config()
         return self._headers.to_csv_line(rc) + "\n" + self.data_to_csv(rc)
 
-    def data_to_csv(self, repr_config=None):
-        if repr_config == None:
+    def data_to_csv(self):
+        rc = self.get_repr_config()
+        return '\n'.join([row.to_csv_line(rc) for row in self._rows])
+
+    def get_repr_config(self):
+        if self.repr_config == None:
             rc = self.compute_csv_repr_config()
         else:
-            rc = repr_config
-        return '\n'.join([row.to_csv_line(rc) for row in self._rows])
+            rc = self.repr_config
+        return rc
 
     def compute_csv_repr_config(self):
         return DataReprConfig(self)
@@ -75,7 +75,10 @@ class DataSet:
             self._rows.append(row_to_clone)
 
     def create_data_set(self, rows):
-        return DataSet(rows, self._class_index, self._headers)
+        data_set = DataSet(rows, self._class_index, self._headers)
+        data_set.repr_config = self.repr_config
+        data_set.name = self.name + "-"
+        return data_set
 
     def get_headers(self):
         return self._headers
@@ -93,7 +96,54 @@ class DataSet:
             self.create_data_set(self._rows[split_index:])
         ]
 
-    def to_arff(self, name, data_repr_config=None):
-        self.compute_csv_repr_config() if data_repr_config==None else data_repr_config
-        return ArffFile(name, self, data_repr_config).to_arff()
+    def to_arff(self):
+        return ArffFile(self.name, self).to_arff()
 
+    def split_and_balance(self, percent_split):
+        new_set = self.randomize()
+
+        # prepare trainingset and testset
+        training_set, test_set = new_set.split(percent_split)
+
+        training_set = training_set.balance_classes()
+        test_set = test_set.balance_classes()
+
+        training_set = training_set.randomize()
+        test_set = test_set.randomize()
+
+        return (training_set, test_set)
+
+    def split_training_and_test_in_one_dataset(self, percent):
+        training_set, test_set = self.split_and_balance(percent)
+        training_set.append(test_set)
+        return training_set
+
+    def append(self, dataset):
+        if self._headers is not dataset._headers:
+            raise Exception("Impossible to append dataset that have not the same headers")
+        self._rows.extend(dataset._rows)
+
+    def without_attributes(self, attributes):
+        def quantify(lst, fct):
+            x = 0
+            for elem in lst:
+                if fct(elem):
+                    x+=1
+            return x
+        if not set(self._headers).issuperset(set(attributes)):
+            raise Exception("attributes '%s' are not in '%s'" % (attributes, self._headers))
+
+        unwanted_indexes = set(
+            [
+                self._headers._row.index(attr) for attr in attributes
+            ]
+        )
+
+        new_class_index = self._class_index - quantify(unwanted_indexes, lambda index : index < self._class_index)
+
+        new_headers = DataInstance(self._headers.create_row_without_attributes(unwanted_indexes), new_class_index)
+
+        new_rows = [
+            row.create_row_without_attributes(unwanted_indexes) for row in self._rows
+        ]
+        return DataSet(new_rows, new_class_index, new_headers)

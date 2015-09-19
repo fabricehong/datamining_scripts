@@ -3,12 +3,13 @@ __author__ = 'fabrice'
 class DataReprConfig:
     quote_char = "'"
     delimiter = ","
-    _header_quoted=set()
-    _values_for_headers={}
-    _header_not_numeric=set()
 
 
-    def __init__(self, csv_rows):
+
+    def __init__(self, dataset):
+        self._header_quoted=set()
+        self._values_for_headers={}
+        self._header_not_numeric=set()
         def is_numeric(str_val):
             try:
                 float(str_val)
@@ -16,7 +17,7 @@ class DataReprConfig:
             except ValueError:
                 return False
 
-        for row in csv_rows.get_rows():
+        for row in dataset.get_rows():
             for cell_index in range(len(row)):
                 cell=row[cell_index]
                 if cell_index in self._values_for_headers:
