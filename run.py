@@ -1,9 +1,11 @@
-from dataset_transform import csv_to_arffs
+from dataset_transform import generate_files
 
 __author__ = 'fabrice'
 
+jobsEventValue = 'http://liip.ch/en/jobs'
+
 def prepareClass(value):
-    if value=='http://liip.ch/en/jobs':
+    if value== ('%s' % jobsEventValue):
         return 'job'
     else:
         return "nojob"
@@ -24,13 +26,11 @@ def prepareLanguage(val):
         return "pt"
     return "other"
 
-dataname = "new_scripts"
-
-def operations_split_in_two(dataset):
+def operations_split_in_two(dataname, dataset):
     new_dataset = dataset.transform_attribute(prepareClass)
 
     repr_config = new_dataset.compute_csv_repr_config()
-    training_set, test_set = new_dataset.split_and_balance(0.66)
+    training_set, test_set = new_dataset.split_and_adjust_up(0.66)
 
     # generate data files
     training_set.name = dataname + "_trainingset"
@@ -41,7 +41,34 @@ def operations_split_in_two(dataset):
     test_set.repr_config = repr_config
     return [training_set, test_set]
 
-def operations_split_in_one(dataset):
+def operations_split_in_one_reduce(dataname, dataset):
+    training_set, test_set = operations_split_in_two_reduce(dataname, dataset)
+    training_set.append(test_set)
+    training_set.name = dataname + "_adjusted-down_splitted"
+    return [training_set]
+
+def operations_split_in_two_reduce(dataname, dataset):
+
+    # egalize before class conversion
+    dataset = dataset.adjust_down(jobsEventValue)
+    dataset = dataset.transform_attribute(prepareClass)
+    # egalize after class conversion
+    dataset = dataset.adjust_down("job")
+    repr_config = dataset.compute_csv_repr_config()
+    dataset = dataset.randomize()
+    training_set, test_set = dataset.split(0.66)
+
+
+    # generate data files
+    training_set.name = dataname + "_adjusted-down_trainingset"
+    test_set.name = dataname + "_adjusted-down__testset"
+
+    # reassign repr config
+    training_set.repr_config = repr_config
+    test_set.repr_config = repr_config
+    return [training_set, test_set]
+
+def operations_split_in_one(dataname, dataset):
     new_dataset = dataset.transform_attribute(prepareClass)
 
     result = new_dataset.split_training_and_test_in_one_dataset(0.66)
@@ -50,12 +77,12 @@ def operations_split_in_one(dataset):
     result.name = dataname + "_splitted"
     return [result]
 
-def generate_training_and_test_set_for(root_dir, dataname, class_index, attributes):
-    def op(dataset):
+def generate_split_with_attr(root_dir, dataname, class_index, attributes):
+    def op(dataname, dataset):
         headers = dataset.get_headers()
         attr_to_remove = [attr for attr in headers if attr not in attributes]
         new_dataset = dataset.without_attributes(attr_to_remove)
-        (training_set,) = operations_split_in_one(new_dataset)
+        (training_set,) = operations_split_in_one_reduce(dataname, new_dataset)
         training_set.name = dataname + "_" + "_".join(
             [
                 attr.split(":")[1][0] for attr in attributes
@@ -63,7 +90,7 @@ def generate_training_and_test_set_for(root_dir, dataname, class_index, attribut
         )
         return [training_set]
 
-    csv_to_arffs(root_dir, dataname, class_index, op)
+    generate_files(root_dir, dataname, class_index, op, "arff")
 
 def generate_all_sub_combination(the_list, min):
     if len(the_list)<min:
@@ -82,12 +109,19 @@ def get_all_attributes_combination(the_list, min):
             result.append(lst)
     return sorted(result, key=lambda x:len(x), reverse=True)
 
-csv_to_arffs("/home/fabrice/datamining/GaRawDataReader/new_scripts/data", dataname, 5, operations_split_in_two)
+#generate_files("/home/fabrice/datamining/GaRawDataReader/class_at_end/data", "class_at_end", 5, operations_split_in_two, "arff")
 
-#generate_training_and_test_set_for("/home/fabrice/datamining/GaRawDataReader/new_scripts/data", dataname,
+#generate_files("/home/fabrice/datamining/GaRawDataReader/class_at_end/data", "class_at_end", 5, operations_split_in_one, "csv")
+
+generate_files("/home/fabrice/datamining/GaRawDataReader/dim_07_segments_vs_no_segments/data", "segments", 5, operations_split_in_two_reduce, "arff")
+#generate_files("/home/fabrice/datamining/GaRawDataReader/class_at_end/data", "class_at_end", 5, operations_split_in_one_reduce, "arff")
+
+
+
+#generate_split_with_attr("/home/fabrice/datamining/GaRawDataReader/dim_06_all_impossible/data", "all_impossible", 0,
 #             ["ga:eventLabel", "ga:deviceCategory", "ga:country", "ga:medium", "ga:javaEnabled", "ga:userType"]
 #             )
 
 #for gen_attrs in get_all_attributes_combination(["ga:deviceCategory", "ga:country", "ga:medium", "ga:javaEnabled", "ga:userType"], 3):
 #    attrs = ["ga:eventLabel"] + gen_attrs
-#    generate_training_and_test_set_for("/home/fabrice/datamining/GaRawDataReader/new_scripts/data", dataname, 5, attrs)
+#    generate_split_with_attr("/home/fabrice/datamining/GaRawDataReader/class_at_end/data", "segments", 5, attrs)

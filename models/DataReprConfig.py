@@ -4,8 +4,6 @@ class DataReprConfig:
     quote_char = "'"
     delimiter = ","
 
-
-
     def __init__(self, dataset):
         self._header_quoted=set()
         self._values_for_headers={}

@@ -17,16 +17,21 @@ def read_csv(file, class_index):
 
 
 
-def csv_to_arffs(root_dir, data_name, class_index, operations):
+def generate_files(root_dir, data_name, class_index, operations, extension):
     def get_output_filename(name):
-        return root_dir + "/" + name + ".arff"
+        return root_dir + "/" + name + "." + extension
 
     # prepare global dataset
     input_file = root_dir + "/" + data_name + ".csv"
     dataset = read_csv(input_file, class_index)
-    list_of_datasets = operations(dataset)
+    list_of_datasets = operations(data_name, dataset)
 
     for ds in list_of_datasets:
-        arff_content = ds.to_arff()
-        write_to_file(get_output_filename(ds.name), arff_content)
-        print(arff_content)
+        if extension=="csv":
+            content = ds.to_csv()
+        elif extension=="arff":
+            content = ds.to_arff()
+        else:
+            raise Exception("unmanaged extension : " + extension)
+        write_to_file(get_output_filename(ds.name), content)
+        print(content)

@@ -37,6 +37,10 @@ class DataSet:
         my_list = [row for row in self._rows if row.get_class_value() == className]
         return self.create_data_set(my_list)
 
+    def get_rows_indexes_with_class(self, className):
+        my_list = [i for i in range(len(self._rows)) if self._rows[i].get_class_value() == className]
+        return my_list
+
     def get_rows(self):
         return self._rows
 
@@ -44,8 +48,8 @@ class DataSet:
         rc = self.get_repr_config()
         return self._headers.to_csv_line(rc) + "\n" + self.data_to_csv(rc)
 
-    def data_to_csv(self):
-        rc = self.get_repr_config()
+    def data_to_csv(self, repr_config=None):
+        rc = self.get_repr_config() if repr_config==None else repr_config
         return '\n'.join([row.to_csv_line(rc) for row in self._rows])
 
     def get_repr_config(self):
@@ -58,7 +62,7 @@ class DataSet:
     def compute_csv_repr_config(self):
         return DataReprConfig(self)
 
-    def balance_classes(self):
+    def adjust_up(self):
         new_dataset = self.create_data_set(list(self._rows))
         counter = Counter([row.get_class_value() for row in new_dataset])
         sorted_class_count = sorted(counter.items(), key=operator.itemgetter(1))
@@ -68,11 +72,30 @@ class DataSet:
             new_dataset.clone_random_class_instances(item[0], instances_to_clone)
         return new_dataset
 
+    def adjust_down(self, referenceClass):
+        new_dataset = self.create_data_set(list(self._rows))
+        counter = Counter([row.get_class_value() for row in new_dataset])
+        sorted_class_count = sorted(counter.items(), key=operator.itemgetter(1))
+        if referenceClass not in counter:
+            raise Exception("Reference '%s' not in found class values : %s" % (referenceClass, sorted_class_count.keys()))
+
+        max = counter[referenceClass]
+        for item in sorted_class_count:
+            instances_to_remove = item[1] - max
+            if (instances_to_remove>0):
+                new_dataset.remove_random_class_instances(item[0], instances_to_remove)
+        return new_dataset
+
     def clone_random_class_instances(self, class_name, instances_to_clone):
         instances_with_class_name=self.get_rows_with_class(class_name)
         for i in range(instances_to_clone):
             row_to_clone = instances_with_class_name[random.randint(0, len(instances_with_class_name)-1)]
             self._rows.append(row_to_clone)
+
+    def remove_random_class_instances(self, class_name, instances_to_remove):
+        indexes_for_classname=self.get_rows_indexes_with_class(class_name)
+        indexes_to_keep = random.sample(indexes_for_classname, instances_to_remove)
+        self._rows = [self._rows[i] for i in range(len(self._rows)) if i not in indexes_to_keep]
 
     def create_data_set(self, rows):
         data_set = DataSet(rows, self._class_index, self._headers)
@@ -99,14 +122,14 @@ class DataSet:
     def to_arff(self):
         return ArffFile(self.name, self).to_arff()
 
-    def split_and_balance(self, percent_split):
+    def split_and_adjust_up(self, percent_split):
         new_set = self.randomize()
 
         # prepare trainingset and testset
         training_set, test_set = new_set.split(percent_split)
 
-        training_set = training_set.balance_classes()
-        test_set = test_set.balance_classes()
+        training_set = training_set.adjust_up()
+        test_set = test_set.adjust_up()
 
         training_set = training_set.randomize()
         test_set = test_set.randomize()
@@ -114,7 +137,7 @@ class DataSet:
         return (training_set, test_set)
 
     def split_training_and_test_in_one_dataset(self, percent):
-        training_set, test_set = self.split_and_balance(percent)
+        training_set, test_set = self.split_and_adjust_up(percent)
         training_set.append(test_set)
         return training_set
 
