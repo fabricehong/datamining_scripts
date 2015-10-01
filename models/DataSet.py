@@ -1,9 +1,9 @@
 from collections import Counter
 import operator
 import itertools
-from models.ArffFile import ArffFile
-from models.DataReprConfig import DataReprConfig
-from models.DataInstance import DataInstance
+from ArffFile import ArffFile
+from DataReprConfig import DataReprConfig
+from DataInstance import DataInstance
 
 __author__ = 'fabrice'
 
