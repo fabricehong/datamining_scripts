@@ -13,17 +13,20 @@ delimiter = ','
 quotechar = "'"
 
 class DataSet:
-    def __init__(self, rows, class_index=0, headers=None):
+    def __init__(self, rows, class_index=None, headers=None):
+        if len(rows)==0:
+            raise Exception("no rows provided")
+        class_column_id = len(rows[0])-1 if class_index==None else class_index
         self.repr_config=None
         self.name="no_name"
         if headers==None:
-            self._headers=DataInstance(rows[0], class_index)
+            self._headers=DataInstance(rows[0], class_column_id)
             r=rows[1:]
         else:
             self._headers=headers
             r=rows
-        self._rows = [DataInstance(row, class_index) for row in r]
-        self._class_index = class_index
+        self._rows = [DataInstance(row, class_column_id) for row in r]
+        self._class_index = class_column_id
 
     def randomize(self):
         new_rows = list(self._rows)
@@ -97,10 +100,10 @@ class DataSet:
         indexes_to_keep = random.sample(indexes_for_classname, instances_to_remove)
         self._rows = [self._rows[i] for i in range(len(self._rows)) if i not in indexes_to_keep]
 
-    def create_data_set(self, rows):
+    def create_data_set(self, rows, new_name="new"):
         data_set = DataSet(rows, self._class_index, self._headers)
         data_set.repr_config = self.repr_config
-        data_set.name = self.name + "-"
+        data_set.name = self.name + "-" + new_name
         return data_set
 
     def get_headers(self):
@@ -115,8 +118,8 @@ class DataSet:
     def split(self, percent):
         split_index = int(len(self._rows)*percent)
         return [
-            self.create_data_set(self._rows[:split_index]),
-            self.create_data_set(self._rows[split_index:])
+            self.create_data_set(self._rows[:split_index], "training"),
+            self.create_data_set(self._rows[split_index:], "test")
         ]
 
     def to_arff(self):

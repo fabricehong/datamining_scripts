@@ -8,14 +8,10 @@ import csv
 delimiter = ','
 quotechar = '"'
 
-def read_csv(file, class_index):
+def read_csv(file, class_index=None):
     with open(file, 'rb') as csvfile:
         spamreader = csv.reader(csvfile, delimiter=delimiter, quotechar=quotechar)
         return DataSet([row for row in spamreader], class_index)
-
-
-
-
 
 def generate_files(root_dir, data_name, class_index, operations, extension):
     def get_output_filename(name):
