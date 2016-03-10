@@ -65,7 +65,7 @@ class DataSet:
     def compute_csv_repr_config(self):
         return DataReprConfig(self)
 
-    def adjust_up(self):
+    def balance_classes_up(self):
         new_dataset = self.create_data_set(list(self._rows))
         counter = Counter([row.get_class_value() for row in new_dataset])
         sorted_class_count = sorted(counter.items(), key=operator.itemgetter(1))
@@ -73,21 +73,25 @@ class DataSet:
         for item in sorted_class_count:
             instances_to_clone = max - item[1]
             new_dataset.clone_random_class_instances(item[0], instances_to_clone)
-        return new_dataset
+        return new_dataset.randomize()
 
-    def adjust_down(self, referenceClass):
+    def adjust_down(self, referenceClassValue):
         new_dataset = self.create_data_set(list(self._rows))
         counter = Counter([row.get_class_value() for row in new_dataset])
         sorted_class_count = sorted(counter.items(), key=operator.itemgetter(1))
-        if referenceClass not in counter:
-            raise Exception("Reference '%s' not in found class values : %s" % (referenceClass, sorted_class_count.keys()))
+        if referenceClassValue not in counter:
+            raise Exception("Reference '%s' not in found class values : %s" % (referenceClassValue, sorted_class_count.keys()))
 
-        max = counter[referenceClass]
+        max = counter[referenceClassValue]
         for item in sorted_class_count:
             instances_to_remove = item[1] - max
             if (instances_to_remove>0):
                 new_dataset.remove_random_class_instances(item[0], instances_to_remove)
         return new_dataset
+
+    def merge_values(self, values_list, new_value, col_index):
+        value_set = set(values_list)
+        return self.transform_attribute(lambda x : new_value if x in value_set else x, col_index)
 
     def clone_random_class_instances(self, class_name, instances_to_clone):
         instances_with_class_name=self.get_rows_with_class(class_name)
@@ -131,8 +135,8 @@ class DataSet:
         # prepare trainingset and testset
         training_set, test_set = new_set.split(percent_split)
 
-        training_set = training_set.adjust_up()
-        test_set = test_set.adjust_up()
+        training_set = training_set.balance_classes_up()
+        test_set = test_set.balance_classes_up()
 
         training_set = training_set.randomize()
         test_set = test_set.randomize()
